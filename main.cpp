@@ -70,14 +70,14 @@ bool simulatePackets(Network network, Packet package) {
     // resetting text file
     ofstream graphFile("Graph.txt");
     if (!graphFile.is_open()) {
-        cerr << "Error in openning file!" << endl;
+        cerr << "Error in opening file!" << endl;
         return false;
     }
     graphFile << "Fastest route to destination:" << endl;
     graphFile.close();
     
     // printing best route
-    for (int i = 0; i < steps.size(); i++) {
+    for (int i = 0; i+1 < steps.size(); i++) {
         drawGraph(network, steps[i], steps[i + 1]);
     }
     cout << endl;
@@ -107,9 +107,6 @@ int main() {
     //main right now is a bunch of tests to make sure my algorithm works properly
     Network network = network.loadingNetwork("network.txt"); //asks user for network
     Packet package = getPackage();
-    bool a = simulatePackets(network, package);
-
-    vector<int> router0Table = network.getNextHop(0);
-    cout << "Next-Hop Routing Table for Router 0:\n";
+    simulatePackets(network, package);
     return 0;
 }

@@ -105,7 +105,7 @@ Network Network::loadingNetwork(string filename) {
     int routers = 0;
     //int edges = 0;
     int weight = 0;
-    int value;
+    int value = -1;
     while(routers <= 0 || routers > 10) {
         cout<<"Enter the number of routers you want (no more than 10): ";
         cin>>routers;
@@ -114,14 +114,21 @@ Network Network::loadingNetwork(string filename) {
     ofstream file(filename); //writing to file
     file<<"# of Routers (will be 0 indexed)"<<endl;
     file<<routers<<endl;
-    file<< "Source, Destination, Weight" << endl;
-    for (int i = 0; i < routers; ++i) { //for loop to connect all the verts and get weights
-        cout<<"Router "<<(i)<<" is connected to what other routers? ";
-        cin>>value;
-        cout<<"What is the weight of this path? ";
-        cin>>weight;
-        file<<(i)<<" "<<value<<" "<<weight<<endl;
-        net.addEdge(i,value,weight);
+    file<< "Source Destination Weight" << endl;
+    for (int i = 0; i < routers; ++i) { 
+        char addMore = 'y';
+        cout << "Enter connections for Router " <<i<< ":" << endl;
+        // Allow multiple connections per router
+        while (addMore == 'y' || addMore == 'Y') {
+            cout << "  Connected to router (destination): ";
+            cin >> value;
+            cout << "  What is the weight of this path? ";
+            cin >> weight;
+            file << i << " " << value << " " << weight << endl;
+            net.addEdge(i, value, weight);
+            cout << "Add another connection for Router "<<i<<"? (y/n): ";
+            cin >> addMore;
+        }
     }
     file.close();
     return net;
