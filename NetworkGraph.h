@@ -12,22 +12,22 @@
 using namespace std;
 
 // keeps asking until the user types a whole number between minVal and maxVal
-int readInt(string prompt, int minVal, int maxVal) {
-    int value;
-    while (true) {
-        cout << prompt;
-        if (cin >> value && value >= minVal && value <= maxVal) {
-            return value; // good input
-        }
-        if (cin.eof()) { // input ran out (Ctrl+D)
-            cout << "\nNo more input, exiting." << endl;
-            exit(1);
-        }
-        cout << "Invalid input. Enter a whole number from " << minVal << " to " << maxVal << "." << endl;
-        cin.clear(); // reset the fail state
-        cin.ignore(numeric_limits<streamsize>::max(), '\n'); // throw away the bad line
-    }
-}
+// int readInt(string prompt, int minVal, int maxVal) {
+//     int value;
+//     while (true) {
+//         cout << prompt;
+//         if (cin >> value && value >= minVal && value <= maxVal) {
+//             return value; // good input
+//         }
+//         if (cin.eof()) { // input ran out (Ctrl+D)
+//             cout << "\nNo more input, exiting." << endl;
+//             exit(1);
+//         }
+//         cout << "Invalid input. Enter a whole number from " << minVal << " to " << maxVal << "." << endl;
+//         cin.clear(); // reset the fail state
+//         cin.ignore(numeric_limits<streamsize>::max(), '\n'); // throw away the bad line
+//     }
+// }
 
 class Network {
     private:
@@ -44,6 +44,7 @@ class Network {
         int countVertices() const; //returns V so we know router amount;
         vector<int> getNextHop(int src); //getNextHop fcn using Dijkstras
         Packet loadNetwork(string filename); //James' part where the user input decides the topology of the network
+        Network loadingNetwork(string filename);
         int getCount(int source, int destination); // returns the weight between 2 networks
 };
 
@@ -100,72 +101,98 @@ vector<int> Network::getNextHop(int src) {
     return nextHop;
 }
 
-Packet Network::loadNetwork(string filename) {
-    // ---- Part 1: ask the user for the network ----
-    int routers = readInt("Enter number of routers: ", 1, 100);
-    int edges = readInt("Enter number of connections: ", 0, routers * (routers - 1) / 2);
-
-    // ---- Part 2: write it to the file ----
-    {
-        ofstream out(filename);
-        if (!out) {
-            cout << "Error: could not write " << filename << endl;
-            exit(1);
-        }
-        out << "# Number of Routers" << endl;
-        out << routers << endl;
-        out << "# Edges: Source, Destination, Weight (Latency in ms)" << endl;
-        for (int i = 0; i < edges; i++) {
-            cout << "Connection " << i + 1 << ":" << endl;
-            int u = readInt("  Router A: ", 0, routers - 1);
-            int v = readInt("  Router B: ", 0, routers - 1);
-            int w = readInt("  Latency (ms): ", 1, 10000);
-            out << u << " " << v << " " << w << endl;
-        }
-    } // out closes here so the file is fully saved before we read it
-
-    // ---- Part 3: read the file back into the graph ----
-    ifstream in(filename); //open the file to read in the network topology
-    if (!in) { //error checking to see if the file opened correctly
-        cout << "Error: could not open " << filename << endl;
-        exit(1);
+Network Network::loadingNetwork(string filename) {
+    int routers = 0;
+    //int edges = 0;
+    int weight = 0;
+    int value;
+    while(routers <= 0 || routers > 10) {
+        cout<<"Enter the number of routers you want (no more than 10): ";
+        cin>>routers;
     }
-    string line;
-    int lineNum = 0;
-    bool gotCount = false;
-
-    while (getline(in, line)) {
-        lineNum++;
-        if (line.empty() || line[0] == '#') continue; //skip empty lines and comments
-
-        stringstream ss(line); // to >> numbers out of the line
-
-        if (!gotCount) {
-            ss >> V; //first line is the number of routers
-            adj.assign(V, {});
-            gotCount = true;
-            cout << "Number of Routers: " << V << endl;
-        } else {
-            int u, v, w; // variables to hold the edge and weight
-            ss >> u >> v >> w; //read in the edge and weight
-            addEdge(u, v, w); //add the edge to the adjacency list
-            cout << "Added edge: " << u << " <--(" << w << ")--> " << v << endl; //print out the edge that was added
-        }
+    Network net(routers); //assign adj size
+    ofstream file(filename); //writing to file
+    file<<"# of Routers (will be 0 indexed)"<<endl;
+    file<<routers<<endl;
+    file<< "Source, Destination, Weight" << endl;
+    for (int i = 0; i < routers; ++i) { //for loop to connect all the verts and get weights
+        cout<<"Router "<<(i)<<" is connected to what other routers? ";
+        cin>>value;
+        cout<<"What is the weight of this path? ";
+        cin>>weight;
+        file<<(i)<<" "<<value<<" "<<weight<<endl;
+        net.addEdge(i,value,weight);
     }
-
-    // ---- Part 4: ask for the packet and return it ----
-    cout << "\nPacket setup:" << endl;
-    int src = readInt("  Source router: ", 0, V - 1);
-    int dst = readInt("  Destination router: ", 0, V - 1);
-    int ttl = readInt("  TTL (max hops): ", 1, 255);
-
-    cin.ignore(numeric_limits<streamsize>::max(), '\n'); // clear the leftover newline before getline
-    string msg;
-    cout << "  Message: ";
-    getline(cin, msg);
-
-    return Packet(1, src, dst, ttl, msg);
+    file.close();
+    return net;
 }
+
+// Packet Network::loadNetwork(string filename) {
+//     // ---- Part 1: ask the user for the network ----
+//     int routers = readInt("Enter number of routers: ", 1, 100);
+//     int edges = readInt("Enter number of connections: ", 0, routers * (routers - 1) / 2);
+
+//     // ---- Part 2: write it to the file ----
+//     {
+//         ofstream out(filename);
+//         if (!out) {
+//             cout << "Error: could not write " << filename << endl;
+//             exit(1);
+//         }
+//         out << "# Number of Routers" << endl;
+//         out << routers << endl;
+//         out << "# Edges: Source, Destination, Weight (Latency in ms)" << endl;
+//         for (int i = 0; i < edges; i++) {
+//             cout << "Connection " << i + 1 << ":" << endl;
+//             int u = readInt("  Router A: ", 0, routers - 1);
+//             int v = readInt("  Router B: ", 0, routers - 1);
+//             int w = readInt("  Latency (ms): ", 1, 10000);
+//             out << u << " " << v << " " << w << endl;
+//         }
+//     } // out closes here so the file is fully saved before we read it
+
+//     // ---- Part 3: read the file back into the graph ----
+//     ifstream in(filename); //open the file to read in the network topology
+//     if (!in) { //error checking to see if the file opened correctly
+//         cout << "Error: could not open " << filename << endl;
+//         exit(1);
+//     }
+//     string line;
+//     int lineNum = 0;
+//     bool gotCount = false;
+
+//     while (getline(in, line)) {
+//         lineNum++;
+//         if (line.empty() || line[0] == '#') continue; //skip empty lines and comments
+
+//         stringstream ss(line); // to >> numbers out of the line
+
+//         if (!gotCount) {
+//             ss >> V; //first line is the number of routers
+//             adj.assign(V, {});
+//             gotCount = true;
+//             cout << "Number of Routers: " << V << endl;
+//         } else {
+//             int u, v, w; // variables to hold the edge and weight
+//             ss >> u >> v >> w; //read in the edge and weight
+//             addEdge(u, v, w); //add the edge to the adjacency list
+//             cout << "Added edge: " << u << " <--(" << w << ")--> " << v << endl; //print out the edge that was added
+//         }
+//     }
+
+//     // ---- Part 4: ask for the packet and return it ----
+//     cout << "\nPacket setup:" << endl;
+//     int src = readInt("  Source router: ", 0, V - 1);
+//     int dst = readInt("  Destination router: ", 0, V - 1);
+//     int ttl = readInt("  TTL (max hops): ", 1, 255);
+
+//     cin.ignore(numeric_limits<streamsize>::max(), '\n'); // clear the leftover newline before getline
+//     string msg;
+//     cout << "  Message: ";
+//     getline(cin, msg);
+
+//     return Packet(1, src, dst, ttl, msg);
+// }
 
 int Network::getCount(int source, int destination) {
     for (const auto& p : adj[source]) {

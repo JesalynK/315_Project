@@ -92,12 +92,21 @@ bool simulatePackets(Network network, Packet package) {
     return true; // succesful delivery
 }
 
+Packet getPackage() {
+    Packet packet(0,0,0,0,"");
+    cout<<"Time to get a packet! What router is the packet starting at? ";
+    cin>>packet.source;
+    cout<<"What router is the packet going to? ";
+    cin>>packet.dest;
+    cout<<"What is the packets time to live? ";
+    cin>>packet.ttl;
+    return packet;
+}
+
 int main() {
     //main right now is a bunch of tests to make sure my algorithm works properly
-    int src = 0;
-
-    Network network(0); // size gets set by loadNetwork
-    Packet package = network.loadNetwork("network.txt"); // asks user for network + packet
+    Network network = network.loadingNetwork("network.txt"); //asks user for network
+    Packet package = getPackage();
     bool a = simulatePackets(network, package);
 
     vector<int> router0Table = network.getNextHop(0);
