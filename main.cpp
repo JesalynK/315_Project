@@ -92,21 +92,34 @@ bool simulatePackets(Network network, Packet package) {
     return true; // succesful delivery
 }
 
-Packet getPackage() {
-    Packet packet(0,0,0,0,"");
+Packet getPackage(Network net) {
+    Packet packet(0,-1,-1,-1,"");
+    cout<<endl;
     cout<<"Time to get a packet! What router is the packet starting at? ";
     cin>>packet.source;
+    while(packet.source < 0 || packet.source > net.countVertices()) {
+        cout<<"Error! source does not exist! Try again: ";
+        cin>>packet.source;
+    }
     cout<<"What router is the packet going to? ";
     cin>>packet.dest;
+    while(packet.dest < 0 || packet.dest > net.countVertices()) {
+        cout<<"Error! Destination does not exist! Try again: ";
+        cin>>packet.dest;
+    }
     cout<<"What is the packets time to live? ";
     cin>>packet.ttl;
+    while(packet.ttl <= 0) {
+        cout<<"Error! Time to live must be greater than 0! Try again: ";
+        cin>>packet.ttl;
+    }
     return packet;
 }
 
 int main() {
     //main right now is a bunch of tests to make sure my algorithm works properly
     Network network = network.loadingNetwork("network.txt"); //asks user for network
-    Packet package = getPackage();
+    Packet package = getPackage(network);
     simulatePackets(network, package);
     return 0;
 }
