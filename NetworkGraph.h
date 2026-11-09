@@ -153,11 +153,8 @@ bool Network::loadNetwork(const string& filename) {
 
     while (getline(in, line)) {
         lineNum++;
-        if (!line.empty() && line.back() == '\r') { // windows line endings
-            line.pop_back();
-        }
 
-        size_t first = line.find_first_not_of(" \t");
+        size_t first = line.find_first_not_of(" \t\r"); // \r is from windows line endings
         if (first == string::npos || line[first] == '#') { // blank, whitespace-only, or comment
             continue;
         }
@@ -167,7 +164,7 @@ bool Network::loadNetwork(const string& filename) {
         if (!gotCount) { // first data line is the router count
             int count;
             if (!(ss >> count) || count < 1 || count > 10) {
-                cerr << "Error (line " << lineNum << "): router count must be 1-10, got \"" << line << "\"" << endl;
+                cerr << "Error (line " << lineNum << "): router count must be 1-10" << endl;
                 return false;
             }
             V = count;
@@ -178,18 +175,23 @@ bool Network::loadNetwork(const string& filename) {
 
         // for the rest of the lines, expect "u v w" for an edge
         int u, v, w;
+        string problem; // stays empty if the line is good
         if (!(ss >> u >> v >> w)) {
-            cerr << "Warning (line " << lineNum << "): expected 3 numbers, skipping \"" << line << "\"" << endl; // bad line didnt match the expected format SKIP it
+            problem = "expected 3 numbers";
         } else if (u < 0 || u >= V || v < 0 || v >= V) {
-            cerr << "Warning (line " << lineNum << "): router must be 0-" << V - 1 << ", skipping" << endl; // bad line router out of bounds SKIP it
+            problem = "router must be 0-" + to_string(V - 1);
         } else if (u == v) {
-            cerr << "Warning (line " << lineNum << "): router can't connect to itself, skipping" << endl; // bad line, used the same router for both ends, SKIP
+            problem = "router can't connect to itself";
         } else if (w < 1 || w > 10000) {
-            cerr << "Warning (line " << lineNum << "): weight must be 1-10000, skipping" << endl; // bad line, weight out of bounds, SKIP
+            problem = "weight must be 1-10000";
         } else if (hasEdge(u, v)) {
-            cerr << "Warning (line " << lineNum << "): routers " << u << " and " << v << " already connected, skipping" << endl; // bad line, already connected, SKIP
-        } else {
+            problem = "routers already connected";
+        }
+
+        if (problem.empty()) {
             addEdge(u, v, w);
+        } else {
+            cerr << "Warning (line " << lineNum << "): " << problem << ", skipping" << endl;
         }
     }
 
