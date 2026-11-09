@@ -122,8 +122,16 @@ Network Network::loadingNetwork(string filename) {
         while (addMore == 'y' || addMore == 'Y') {
             cout << "  Connected to router (destination): ";
             cin >> value;
+            while(value < 0 || value > routers) {
+                cout<<"Error! That router does not exist. Try again: ";
+                cin>>value;
+            }
             cout << "  What is the weight of this path? ";
             cin >> weight;
+            while(weight <= 0) {
+                cout<<"Error. Weight can not be zero or lower. Try again: ";
+                cin>>weight;
+            }
             file << i << " " << value << " " << weight << endl;
             net.addEdge(i, value, weight);
             cout << "Add another connection for Router "<<i<<"? (y/n): ";
