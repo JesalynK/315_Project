@@ -7,27 +7,63 @@
 #include <fstream>
 #include <string>
 #include <sstream>
-#include <limits>
+#include <cctype>
+#include <cstdlib>
 #include "Packet.h"
 using namespace std;
 
-// keeps asking until the user types a whole number between minVal and maxVal
-// int readInt(string prompt, int minVal, int maxVal) {
-//     int value;
-//     while (true) {
-//         cout << prompt;
-//         if (cin >> value && value >= minVal && value <= maxVal) {
-//             return value; // good input
-//         }
-//         if (cin.eof()) { // input ran out (Ctrl+D)
-//             cout << "\nNo more input, exiting." << endl;
-//             exit(1);
-//         }
-//         cout << "Invalid input. Enter a whole number from " << minVal << " to " << maxVal << "." << endl;
-//         cin.clear(); // reset the fail state
-//         cin.ignore(numeric_limits<streamsize>::max(), '\n'); // throw away the bad line
-//     }
-// }
+inline string readLine(const string& prompt) {
+    cout << prompt;
+    string line;
+    if (!getline(cin, line)) {
+        cerr << "\nInput ended unexpectedly. Exiting." << endl;
+        exit(EXIT_FAILURE);
+    }
+    return line;
+}
+// keeps asking until the user enters a single whole number from minVal to maxVal to prevent loop of doom
+// rejects letters, decimals, extra text, and out-of-range values like negs including negatives
+inline int getValidInt(const string& prompt, int minVal, int maxVal) {
+    while (true) {
+        stringstream ss(readLine(prompt));
+        long long value; // long long so huge numbers still get caught by the range check
+        string leftover;
+
+        if (!(ss >> value)) {
+            cout << "  That's not a number. Please enter a whole number." << endl;
+        } else if (ss >> leftover) {
+            if (leftover[0] == '.') {
+                cout << "  Decimals aren't allowed. Please enter a whole number." << endl;
+            } else {
+                cout << "  Please enter just one whole number (no extra text)." << endl;
+            }
+        } else if (value < minVal || value > maxVal) {
+            cout << "  Out of range. Enter a number from " << minVal << " to " << maxVal << "." << endl;
+        } else {
+            return static_cast<int>(value); //already checked it fits in minVal, maxVal
+        }
+    }
+}
+
+// Asks a yes/no question. Accepts y, yes, n, no in any capitalization.
+inline bool getYesNo(const string& prompt) {
+    while (true) {
+        stringstream ss(readLine(prompt));
+        string answer;
+        ss >> answer; // first word only, ignores extra spaces
+        for (char& c : answer) {
+            c = tolower((unsigned char)c);
+        }
+
+        if (answer == "y" || answer == "yes") {
+            return true;
+        }
+        if (answer == "n" || answer == "no") {
+            return false;
+        }
+        cout << "  Please answer y or n." << endl;
+    }
+}
 
 class Network {
     private:
@@ -43,8 +79,9 @@ class Network {
         void addEdge(int u, int v, int weight); //adds an edge to adj
         int countVertices() const; //returns V so we know router amount;
         vector<int> getNextHop(int src); //getNextHop fcn using Dijkstras
-        Packet loadNetwork(string filename); //James' part where the user input decides the topology of the network
-        Network loadingNetwork(string filename);
+        bool loadNetwork(const string& filename); //James: file parser, reads a topology file into this graph
+        static Network loadingNetwork(const string& filename); //asks the user for a network, saves it to a file, then loads that file
+        bool hasEdge(int u, int v) const; //true if routers u and v are already linked
         int getCount(int source, int destination); // returns the weight between 2 networks
 };
 
@@ -101,113 +138,131 @@ vector<int> Network::getNextHop(int src) {
     return nextHop;
 }
 
-Network Network::loadingNetwork(string filename) {
-    int routers = 0;
-    //int edges = 0;
-    int weight = 0;
-    int value = -1;
-    while(routers <= 0 || routers > 10) {
-        cout<<"Enter the number of routers you want (no more than 10): ";
-        cin>>routers;
+// skips blank lines and # comments. Bad edge lines are reported with their line number and skipped so user knows what they did wrong
+// returns false if the file can't be opened or has no valid router count so  no errors are thrown, just a false return to indicate failure
+bool Network::loadNetwork(const string& filename) {
+    ifstream in(filename);
+    if (!in) {
+        cerr << "Error: could not open " << filename << endl;
+        return false;
     }
-    Network net(routers); //assign adj size
-    ofstream file(filename); //writing to file
-    file<<"# of Routers (will be 0 indexed)"<<endl;
-    file<<routers<<endl;
-    file<< "Source Destination Weight" << endl;
-    for (int i = 0; i < routers; ++i) { 
-        char addMore = 'y';
-        cout << "Enter connections for Router " <<i<< ":" << endl;
-        // Allow multiple connections per router
-        while (addMore == 'y' || addMore == 'Y') {
-            cout << "  Connected to router (destination): ";
-            cin >> value;
-            while(value < 0 || value > routers) {
-                cout<<"Error! That router does not exist. Try again: ";
-                cin>>value;
+
+    string line;
+    int lineNum = 0;
+    bool gotCount = false;
+
+    while (getline(in, line)) {
+        lineNum++;
+        if (!line.empty() && line.back() == '\r') { // windows line endings
+            line.pop_back();
+        }
+
+        size_t first = line.find_first_not_of(" \t");
+        if (first == string::npos || line[first] == '#') { // blank, whitespace-only, or comment
+            continue;
+        }
+
+        stringstream ss(line);
+
+        if (!gotCount) { // first data line is the router count
+            int count;
+            if (!(ss >> count) || count < 1 || count > 10) {
+                cerr << "Error (line " << lineNum << "): router count must be 1-10, got \"" << line << "\"" << endl;
+                return false;
             }
-            cout << "  What is the weight of this path? ";
-            cin >> weight;
-            while(weight <= 0) {
-                cout<<"Error. Weight can not be zero or lower. Try again: ";
-                cin>>weight;
-            }
-            file << i << " " << value << " " << weight << endl;
-            net.addEdge(i, value, weight);
-            cout << "Add another connection for Router "<<i<<"? (y/n): ";
-            cin >> addMore;
+            V = count;
+            adj.assign(V, {});
+            gotCount = true;
+            continue;
+        }
+
+        // for the rest of the lines, expect "u v w" for an edge
+        int u, v, w;
+        if (!(ss >> u >> v >> w)) {
+            cerr << "Warning (line " << lineNum << "): expected 3 numbers, skipping \"" << line << "\"" << endl; // bad line didnt match the expected format SKIP it
+        } else if (u < 0 || u >= V || v < 0 || v >= V) {
+            cerr << "Warning (line " << lineNum << "): router must be 0-" << V - 1 << ", skipping" << endl; // bad line router out of bounds SKIP it
+        } else if (u == v) {
+            cerr << "Warning (line " << lineNum << "): router can't connect to itself, skipping" << endl; // bad line, used the same router for both ends, SKIP
+        } else if (w < 1 || w > 10000) {
+            cerr << "Warning (line " << lineNum << "): weight must be 1-10000, skipping" << endl; // bad line, weight out of bounds, SKIP
+        } else if (hasEdge(u, v)) {
+            cerr << "Warning (line " << lineNum << "): routers " << u << " and " << v << " already connected, skipping" << endl; // bad line, already connected, SKIP
+        } else {
+            addEdge(u, v, w);
         }
     }
-    file.close();
-    return net;
+
+    if (!gotCount) {
+        cerr << "Error: " << filename << " has no router count" << endl; //for empty files or only comments/blanks
+        return false;
+    }
+    return true;
 }
 
-// Packet Network::loadNetwork(string filename) {
-//     // ---- Part 1: ask the user for the network ----
-//     int routers = readInt("Enter number of routers: ", 1, 100);
-//     int edges = readInt("Enter number of connections: ", 0, routers * (routers - 1) / 2);
+// true if routers u and v already have a link between them
+bool Network::hasEdge(int u, int v) const {
+    for (const auto& edge : adj[u]) {
+        if (edge.first == v) {
+            return true;
+        }
+    }
+    return false;
+}
 
-//     // ---- Part 2: write it to the file ----
-//     {
-//         ofstream out(filename);
-//         if (!out) {
-//             cout << "Error: could not write " << filename << endl;
-//             exit(1);
-//         }
-//         out << "# Number of Routers" << endl;
-//         out << routers << endl;
-//         out << "# Edges: Source, Destination, Weight (Latency in ms)" << endl;
-//         for (int i = 0; i < edges; i++) {
-//             cout << "Connection " << i + 1 << ":" << endl;
-//             int u = readInt("  Router A: ", 0, routers - 1);
-//             int v = readInt("  Router B: ", 0, routers - 1);
-//             int w = readInt("  Latency (ms): ", 1, 10000);
-//             out << u << " " << v << " " << w << endl;
-//         }
-//     } // out closes here so the file is fully saved before we read it
+// ask user to build a network, saves it to filename, then loads it back with the parser.
+// static, so it's called as Network::loadingNetwork without needing an existing Network.
+Network Network::loadingNetwork(const string& filename) {
+    int routers = getValidInt("Enter the number of routers you want (1-10): ", 1, 10);
 
-//     // ---- Part 3: read the file back into the graph ----
-//     ifstream in(filename); //open the file to read in the network topology
-//     if (!in) { //error checking to see if the file opened correctly
-//         cout << "Error: could not open " << filename << endl;
-//         exit(1);
-//     }
-//     string line;
-//     int lineNum = 0;
-//     bool gotCount = false;
+    // linked a b is true once a and b are connected, so 0-1 and 1-0 can't both be added
+    vector<vector<bool>> linked(routers, vector<bool>(routers, false));
+    vector<string> edgeLines; // "u v w" lines for the file
 
-//     while (getline(in, line)) {
-//         lineNum++;
-//         if (line.empty() || line[0] == '#') continue; //skip empty lines and comments
+    for (int i = 0; i < routers && routers > 1; ++i) { // a single router has nothing to connect to
+        cout << endl << "Router " << i << ":" << endl;
 
-//         stringstream ss(line); // to >> numbers out of the line
+        while (getYesNo("  Add a connection from router " + to_string(i) + "? (y/n): ")) {
+            int dest = getValidInt("    Connected to router (0-" + to_string(routers - 1) + "): ", 0, routers - 1);
 
-//         if (!gotCount) {
-//             ss >> V; //first line is the number of routers
-//             adj.assign(V, {});
-//             gotCount = true;
-//             cout << "Number of Routers: " << V << endl;
-//         } else {
-//             int u, v, w; // variables to hold the edge and weight
-//             ss >> u >> v >> w; //read in the edge and weight
-//             addEdge(u, v, w); //add the edge to the adjacency list
-//             cout << "Added edge: " << u << " <--(" << w << ")--> " << v << endl; //print out the edge that was added
-//         }
-//     }
+            if (dest == i) {
+                cout << "    A router can't connect to itself." << endl;
+                continue;
+            }
+            if (linked[i][dest]) {
+                cout << "    Router " << i << " and router " << dest << " are already connected." << endl;
+                continue;
+            }
 
-//     // ---- Part 4: ask for the packet and return it ----
-//     cout << "\nPacket setup:" << endl;
-//     int src = readInt("  Source router: ", 0, V - 1);
-//     int dst = readInt("  Destination router: ", 0, V - 1);
-//     int ttl = readInt("  TTL (max hops): ", 1, 255);
+            int weight = getValidInt("    Latency of this link in ms (1-10000): ", 1, 10000);
 
-//     cin.ignore(numeric_limits<streamsize>::max(), '\n'); // clear the leftover newline before getline
-//     string msg;
-//     cout << "  Message: ";
-//     getline(cin, msg);
+            linked[i][dest] = true;
+            linked[dest][i] = true; // links go both ways
+            edgeLines.push_back(to_string(i) + " " + to_string(dest) + " " + to_string(weight));
+        }
+    }
 
-//     return Packet(1, src, dst, ttl, msg);
-// }
+    ofstream file(filename);
+    if (!file) {
+        cerr << "Error: could not write " << filename << endl;
+        exit(EXIT_FAILURE);
+    }
+    file << "# Number of Routers" << endl;
+    file << routers << endl;
+    file << "# Edges: Source, Destination, Weight (Latency in ms)" << endl;
+    for (const string& edge : edgeLines) {
+        file << edge << endl;
+    }
+    file.close(); // has to be closed before we read it back
+
+    Network net(0);
+    if (!net.loadNetwork(filename)) {
+        exit(EXIT_FAILURE);
+    }
+    cout << endl << "Loaded " << net.countVertices() << " routers and " << edgeLines.size()
+         << " connections from " << filename << endl;
+    return net;
+}
 
 int Network::getCount(int source, int destination) {
     for (const auto& p : adj[source]) {
