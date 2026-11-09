@@ -95,33 +95,22 @@ bool simulatePackets(Network network, Packet package) {
     return true; // succesful delivery
 }
 
-Packet getPackage(Network net) {
-    Packet packet(0,-1,-1,-1,"");
-    cout<<endl;
-    cout<<"Time to get a packet! What router is the packet starting at? ";
-    cin>>packet.source;
-    while(packet.source < 0 || packet.source > net.countVertices()) {
-        cout<<"Error! source does not exist! Try again: ";
-        cin>>packet.source;
-    }
-    cout<<"What router is the packet going to? ";
-    cin>>packet.dest;
-    while(packet.dest < 0 || packet.dest > net.countVertices()) {
-        cout<<"Error! Destination does not exist! Try again: ";
-        cin>>packet.dest;
-    }
-    cout<<"What is the packets time to live? ";
-    cin>>packet.ttl;
-    while(packet.ttl <= 0) {
-        cout<<"Error! Time to live must be greater than 0! Try again: ";
-        cin>>packet.ttl;
-    }
-    return packet;
+// asks the user for the packet's route, TTL, and message
+Packet getPackage(const Network& net) {
+    int lastRouter = net.countVertices() - 1;
+
+    cout << endl << "Time to get a packet!" << endl;
+    int source = getValidInt("What router is the packet starting at? (0-" + to_string(lastRouter) + "): ", 0, lastRouter);
+    int dest = getValidInt("What router is the packet going to? (0-" + to_string(lastRouter) + "): ", 0, lastRouter);
+    int ttl = getValidInt("What is the packet's time to live? (1-255): ", 1, 255);
+    string message = readLine("Message to send: ");
+
+    return Packet(1, source, dest, ttl, message);
 }
 
 int main() {
     //main right now is a bunch of tests to make sure my algorithm works properly
-    Network network = network.loadingNetwork("network.txt"); //asks user for network
+    Network network = Network::loadingNetwork("network.txt"); //asks user for network, saves it, loads it back
     Packet package = getPackage(network);
     simulatePackets(network, package);
     return 0;
