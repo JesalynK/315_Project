@@ -35,8 +35,6 @@ void drawGraph(Network network, int source, int destination) {
     }
     
     graphFile.close();
-
-    // read text file and display node
 }
 
 // returns true if succesful and false if failed
@@ -77,8 +75,13 @@ bool simulatePackets(Network network, Packet package) {
     graphFile.close();
     
     // printing best route
-    for (int i = 0; i+1 < steps.size(); i++) {
-        drawGraph(network, steps[i], steps[i + 1]);
+    for (int i = 0; i < steps.size(); i++) {
+        if (i + 1 == steps.size()) {
+            drawGraph(network, steps[i], steps[i]);
+        }
+        else {
+            drawGraph(network, steps[i], steps[i + 1]);
+        }
     }
     cout << endl;
     
